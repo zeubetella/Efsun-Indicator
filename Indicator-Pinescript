@@ -1,0 +1,67 @@
+// integrated by @zeubetella - 11.05.2023
+// İndikatörün yaratıcısı sayın @YgtKyn hocamızdır, ben sadece entegrasyonunu sağladım.
+// İndikatör içerisinde MOST/TOMA kullanılmıştır; bu sistemin yaratıcısı @Anil_Ozeksi hocamızdır, orijinaline arama çubuğuna "MOST" yazarak ulaşabilirsiniz.
+// Orijinaline ufak bir ekleme yaparak, MOST çizgisinin cd'yi yukarı kestiği noktalara "al" işareti veren bir bar, aşağı kestiği noktalara "sat" işareti verme özelliği ekledim.
+// İndikatörde değiştirebileceğiniz iki değer vardır. Bu iki değerin kendiniz için optimal olanını bulmalısınız, default değerler beklentinizi karşılamayabilir.
+// İndikatör 60 dakika ve altı periyotlarda çalışmaktadır. Sorularınız için: zeubetella@protonmail.com
+
+// Integrated by @zeubetella - 11.05.2023
+// The creator of the indicator is Mr. @YgtKyn, I merely facilitated the integration.
+// The MOST/TOMA system is used within the indicator; this system was created by Mr. @Anil_Ozeksi. You can find the original by typing "MOST" into the search bar.
+// I added a small feature to the original, which provides a "buy" sign on the bar where the MOST line crosses above the 'cd', and a "sell" sign where it crosses below.
+// There are two values you can change in the indicator. You should find what is optimal for you, as the default values may not meet your expectations.
+// The indicator works in periods of 60 minutes and below. For your questions: zeubetella@protonmail.com
+
+//@version=5
+indicator("Efsun by YgtKyn & zeubetella", shorttitle="Efsun", overlay=true)
+
+variable1 = input(10, title="MA Periyodu")
+variable2 = input(0.5, title="Yüzde")
+ab = 2/(variable1+1)
+
+// Burada "cd" / "EXMOV" hesaplaması yapılıyor.
+// Here, the calculation of "cd" / "EXMOV" is being calculated.
+
+var float cd = na
+if (hour(time) != hour(time[1]))
+    cd := ab*close[1] + (1-ab)*nz(cd[1])
+
+// Burada "MOST" hesaplaması yapılıyor.
+// Here, the calculation of "MOST" is being calculated.
+
+avg0 = ta.ema(cd, variable1)
+
+avg1 = avg0 - (avg0 * variable2 / 100)
+avg2 = avg0 + (avg0 * variable2 / 100)
+
+var float line1 = na
+var float line2 = na
+
+line1 := na(line1[1]) ? avg1 : (avg0 < line1[1] ? avg1 : (avg1 > line1[1] ? avg1 : line1[1]))
+line2 := na(line2[1]) ? avg2 : (avg0 > line2[1] ? avg2 : (avg2 < line2[1] ? avg2 : line2[1]))
+
+cond1 = ta.crossover(avg0, line2[1])
+cond2 = ta.crossunder(line1[1], avg0)
+
+s1 = ta.barssince(cond1) < ta.barssince(cond2)
+s2 = s1 ? line1 : line2
+
+// Hesaplanan "MOST" ve "ExMov" değerleri burada ekrana çizgi olarak görselleştiriliyor.
+// The calculated "MOST" and "ExMov" values are being visualized as lines on the screen here.
+
+plot(s2, "MOST", color=color.white)
+plot(cd, "ExMov", color=color.yellow)
+
+// "MOST" ve "ExMov" kesişimleri burada tanımlanıyor ve ekrana yazdırılıyor.
+// The intersections of "MOST" and "ExMov" are being defined and displayed on the screen here.
+
+condbuy = ta.crossover(cd, s2) 
+condsell = ta.crossunder(cd, s2) 
+
+plotshape(condbuy ? cd -30 : na , color=color.new(color.green, 0), location=location.absolute, style=shape.triangleup, size=size.small, offset=0)
+plotshape(condsell ? cd +30 : na , color=color.rgb(233 , 30, 99), location=location.absolute, style=shape.triangledown, size=size.small, offset=0)
+
+// Kod bitiş...
+// End of the code...
+// Afiyet olsun...
+// Bon appetit...
