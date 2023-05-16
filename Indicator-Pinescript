@@ -2,34 +2,45 @@
 // İndikatörün yaratıcısı sayın @YgtKyn hocamızdır, ben sadece entegrasyonunu sağladım.
 // İndikatör içerisinde MOST/TOMA kullanılmıştır; bu sistemin yaratıcısı @Anil_Ozeksi hocamızdır, orijinaline arama çubuğuna "MOST" yazarak ulaşabilirsiniz.
 // Orijinaline ufak bir ekleme yaparak, MOST çizgisinin cd'yi yukarı kestiği noktalara "al" işareti veren bir bar, aşağı kestiği noktalara "sat" işareti verme özelliği ekledim.
-// İndikatörde değiştirebileceğiniz iki değer vardır. Bu iki değerin kendiniz için optimal olanını bulmalısınız, default değerler beklentinizi karşılamayabilir.
+// İndikatörde değiştirebileceğiniz iki değer vardır. Bu iki değerin kendiniz için optimal olanını bulmalısınız, default değerler beklentinizi karşılamayabilir..
 // İndikatör 60 dakika ve altı periyotlarda çalışmaktadır. Sorularınız için: zeubetella@protonmail.com
 
 // Integrated by @zeubetella - 11.05.2023
 // The creator of the indicator is Mr. @YgtKyn, I merely facilitated the integration.
 // The MOST/TOMA system is used within the indicator; this system was created by Mr. @Anil_Ozeksi. You can find the original by typing "MOST" into the search bar.
 // I added a small feature to the original, which provides a "buy" sign on the bar where the MOST line crosses above the 'cd', and a "sell" sign where it crosses below.
-// There are two values you can change in the indicator. You should find what is optimal for you, as the default values may not meet your expectations.
+// There are two values you can change in the indicator. You should find what is optimal for you, as the default values may not meet your expectations...
 // The indicator works in periods of 60 minutes and below. For your questions: zeubetella@protonmail.com
 
 //@version=5
 indicator("Efsun by YgtKyn & zeubetella", shorttitle="Efsun", overlay=true)
 
-variable1 = input(10, title="MA Periyodu")
-variable2 = input(0.5, title="Yüzde")
+variable1 = input(10, title="MA Periyodu / Ma Period", group="Veri Ayarları | Data Settings")
+float variable2 = input(0.5, title="Yüzde / Percentage", group="Veri Ayarları | Data Settings")
 ab = 2/(variable1+1)
 
 // Burada "cd" / "EXMOV" hesaplaması yapılıyor.
 // Here, the calculation of "cd" / "EXMOV" is being calculated.
 
 var float cd = na
-if (hour(time) != hour(time[1]))
-    cd := ab*close[1] + (1-ab)*nz(cd[1])
+var float[] hourlyData = array.new_float()
+
+isLessThan1Hour = timeframe.isminutes and timeframe.multiplier < 61
+
+updateHourlyData() =>
+    if isLessThan1Hour
+        array.unshift(hourlyData, ta.ema(close, variable1))
+
+calculateCD() =>
+    isLessThan1Hour ? array.get(hourlyData, 0) : ta.ema(close, 10)
+
+updateHourlyData()
+cd := calculateCD()
 
 // Burada "MOST" hesaplaması yapılıyor.
 // Here, the calculation of "MOST" is being calculated.
 
-avg0 = ta.ema(cd, variable1)
+avg0 = ta.ema(close , variable1)
 
 avg1 = avg0 - (avg0 * variable2 / 100)
 avg2 = avg0 + (avg0 * variable2 / 100)
@@ -49,17 +60,46 @@ s2 = s1 ? line1 : line2
 // Hesaplanan "MOST" ve "ExMov" değerleri burada ekrana çizgi olarak görselleştiriliyor.
 // The calculated "MOST" and "ExMov" values are being visualized as lines on the screen here.
 
-plot(s2, "MOST", color=color.white)
-plot(cd, "ExMov", color=color.yellow)
+p1 = plot(s2, "MOST", color=color.yellow, linewidth = 2)
+p2 = plot(avg0, "ExMov", color=color.white, linewidth = 2)
+
+showFill =  input(false, "Show Fill Color | Dolguları Göster", group="Görsel İyileştirmeler | Visualize Enhancements")
+
+fill(p1, p2, color=showFill ? (avg0 > s2 ? color.new(color.green, 70) : color.new(color.red, 70)) : na)
+
+showBarColor = input(false, "Show Bar Color | Barları Boya", group="Görsel İyileştirmeler | Visualize Enhancements")
+showBarColor2 = avg0 > s2
+
+barcolor(showBarColor ? (showBarColor2 ? color.new(color.white, 0) : color.new(color.yellow, 0)) : na)
 
 // "MOST" ve "ExMov" kesişimleri burada tanımlanıyor ve ekrana yazdırılıyor.
-// The intersections of "MOST" and "ExMov" are being defined and displayed on the screen here.
+// The crossings of "MOST" and "ExMov" are being defined and displayed on the screen here..
 
-condbuy = ta.crossover(cd, s2) 
-condsell = ta.crossunder(cd, s2) 
+condbuy = ta.crossover(cd, s2)
+condsell = ta.crossunder(cd, s2)
 
-plotshape(condbuy ? cd -30 : na , color=color.new(color.green, 0), location=location.absolute, style=shape.triangleup, size=size.small, offset=0)
-plotshape(condsell ? cd +30 : na , color=color.rgb(233 , 30, 99), location=location.absolute, style=shape.triangledown, size=size.small, offset=0)
+///////////////////////////////////////// shape offset in y axis \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\
+
+// Calculate the highest and lowest price
+highestPrice = ta.highest(high, variable1)
+lowestPrice = ta.lowest(low, variable1)
+
+// User input for adjusting the shape offset
+showShapes = input(false, "Okları Göster | Show the Triangles", group="Görsel İyileştirmeler | Visualize Enhancements")
+shapeOffsetPercent = input(5, title="Shape Offset (%)", group="Görsel İyileştirmeler | Visualize Enhancements")
+
+// Calculate the offset
+shapeOffset = (highestPrice - lowestPrice) * shapeOffsetPercent / 30
+
+plotshape(showShapes and condbuy ? cd - shapeOffset : na, color=color.new(color.green, 0), location=location.absolute, style=shape.triangleup, size=size.small, offset=0)
+plotshape(showShapes and condsell ? cd + shapeOffset : na, color=color.rgb(233, 30, 99), location=location.absolute, style=shape.triangledown, size=size.small, offset=0)
+
+///////////////////////////////////////// bu kısımda, ekranın sağ altında yazan al/sat bilgileri yazdırılıyor \\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\\.
+
+if condsell
+    table.cell(table.new(position = position.bottom_right, columns = 1, rows = 1, bgcolor = color.yellow, border_width = 1), 0, 0, "SAT | SELL")
+if condbuy
+    table.cell(table.new(position = position.bottom_right, columns = 1, rows = 1, bgcolor = color.white, border_width = 1), 0, 0, "AL | BUY")
 
 // Kod bitiş...
 // End of the code...
